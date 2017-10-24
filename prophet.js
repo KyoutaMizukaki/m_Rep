@@ -1,9 +1,9 @@
 const nj = require("numjs");
 const DF = require("pandas-js").DataFrame;
-const time_d = require("datetime");
 const linspace = require("linspace");
 
 class prophet_js {
+
     /*
     Parameters
     ----------
@@ -22,7 +22,7 @@ class prophet_js {
         Can be 'auto', True, False, or a number of Fourier terms to generate.
     holidays: pd.DataFrame with columns holiday (string) and ds (date type)
         and optionally columns lower_window and upper_window which specify a
-        range of days around the date to be included as holidays.
+        prophet_js.range of days around the date to be included as holidays.
         lower_window=-2 will include 2 days prior to the date as holidays. Also
         optionally can have a column prior_scale specifying the prior scale for
         that holiday.
@@ -119,6 +119,28 @@ class prophet_js {
         return len;
     }
 
+    Date_max(date){
+        let last = date[0].ds;
+        for(let i = 0; i< this.shape0(date)-1; i++){/*dsの最大値を求める*/
+            if(last.getTime() < date[i+1].ds.getTime()){
+                last = date[i+1].ds;
+                console.log("date_max");
+                console.log(last);
+            }
+        }
+        return last;
+    }
+    Date_min(date){
+        let first = date[0].ds;
+        for(let i = 0; i< this.shape0(date)-1; i++){/*dsの最小値を求める*/
+            if(first.getTime() > date[i+1].ds.getTime()){
+                first = date[i+1].ds;
+                console.log("date_min");
+                console.log(first);
+            }
+        }
+        return first;
+    }
     /*
     c_array_push(array,pra){
         let c_array = [];
@@ -133,14 +155,14 @@ class prophet_js {
     /*既存のjsonオブジェクトに新しいパラメータを挿入します*/ 
     json_add(df,injson,mode){
         if(mode == 0){
-            let len = shape0(df);
+            let len = this.shape0(df);
             for(let i=0; i < len; i++){
                 df[i] = Object.assign(df[i],injson);
             }
             return df;
         }
         if(mode == 1){
-            let len = shape0(df);
+            let len = this.shape0(df);
             for(let i=0; i < len; i++){
                 df[i] = Object.assign(df[i],injson[i]);
             }
@@ -156,11 +178,17 @@ class prophet_js {
         return s_array;
     }
 
-    average(arr){
-        return sum(arr)/arr.length;
-    }
 
-    formatDate(date) {/*date型を文字列型に直す*/
+    average(arr){
+        var sum = 0;
+        arr.forEach(function(elm) {
+            sum += elm;
+            });
+            return sum/arr.length;
+        }
+    
+
+    formatDate(date){/*date型を文字列型に直す*/
         const yyyy = new String(date.getFullYear());
         const mm = new String(date.getMonth() + 1);
         const dd = new String(date.getDate());
@@ -258,9 +286,13 @@ class prophet_js {
         -------
         pd.DataFrame prepared for fitting or predicting.
         */
-        let len;
-        let c_array = [];//チェック用配列
-        let work = [];//dfオブジェクト追加時保存用の配列
+        console.log("df:setup_dataframe");
+        console.log(df);
+        let df_ds = [];//チェック用配列
+        let df_y = [];
+        let df_floor =[];
+        let df_y_scaled = [];
+        let cal_work = [];
 
         function sort_by(field, reverse, primer){
             reverse = (reverse) ? -1 : 1;
@@ -308,11 +340,16 @@ class prophet_js {
         c_array.length = 0;//チェック用配列を空にする
         console.log(c_array);
         */
-        for(let i = 0; i<shape0(df); i++){
-            c_array[i] = {"ds":new Date(df[i].ds)}; 
+        for(let i = 0; i<this.shape0(df); i++){
+            df_ds[i] = {"ds":new Date(df[i].ds)}; 
         }
-        df = json_add(df,c_array,1);
-        for(let i = 0; i<shape0(df); i++){
+        console.log("df_ds[i]:319");
+        console.log(df_ds);
+        df = this.json_add(df,df_ds,1);
+        console.log("df:323");
+        console.log(df);
+
+        for(let i = 0; i<this.shape0(df); i++){
             if(df[i].ds == null)
              console.log("Found NaN in column ds.");
         }
@@ -322,8 +359,8 @@ class prophet_js {
                 console.log("Regressor "+name+" missing from dataframe")
             }
         }
-        //pandas-jsはdfの場合ソート不可 
-        df = df.sort(sort_by("y",false,parseFloat)); 
+        //pandas-jsはdfの場合ソート不可(seriesなら可)
+        df = df.sort(sort_by("ds",false,parseFloat)); 
 
         //df.reset_index({drop: true});
 
@@ -337,18 +374,30 @@ class prophet_js {
         else{
             let flo = {};
             flo.floor = 0;
-            df = json_add(df,flo); 
+            df = this.json_add(df,flo,0); 
+            console.log("df:352");
+            console.log(df);
         }
-        /*
-        if(this.growth == "logistic"){
-            if("cap" in df == true){
-                df["cap_scaled"] = (df["cap"] - df["floor"]) / this.y_scale;//あとで（線形想定のため）
+        let df_t = [];
+        for(let i = 0; i < df_ds.length; i++){
+            df_t[i] = {"t":((df_ds[i].ds - this.start)/this.t_scale)};
+        }
+        console.log("df_t:359");
+        console.log(df_t);
+        df = this.json_add(df,df_t,1);
+        
+        if("y" in df){
+            for(let a_c_cnt in df){
+                df_y.push(df[a_c_cnt].y); 
+                df_floor.push(df[a_c_cnt].floor);
             }
-            else{
-                console.log("Missing 'cap' in df");
-            } 
+            for(let i = 0; i < df_y.length; i++){
+                df_y_scaled[i] = {"y_scaled":((df_y[i] - df_floor[i])/this.t_scale)};
+            }
+            df = this.json_add(df,df_y_scaled,1);
         }
-        */
+        console.log("y_scaled");
+        console.log(this.y_scaled);
         /*
         for name, props in this.extra_regressors
             df[name] = pd.to_numeric(df[name])
@@ -356,6 +405,8 @@ class prophet_js {
             if df[name].isnull().any():
                 raise ValueError('Found NaN in column ' + name)
         */
+        console.log("df:setup_dataframe_last");
+        console.log(df);
         return df;
              
     }
@@ -371,12 +422,14 @@ class prophet_js {
         initialize_scales: Boolean set the scales or not.
         df: pd.DataFrame for setting scales.
         */
-        
+        let df_ds = [];
+        let df_y = [];
+        let df_name = [];
+        let floor;
 
         if(initialize_scales != true){
             return;
         }
-        /* 線形モデルを想定しているのでカット
         if(this.growth == "logistic" && "floor" in df)
         {
             this.logistic_floor = true;
@@ -386,7 +439,44 @@ class prophet_js {
         {
             floor = 0;
         }
-        */      
+        for(let i = 0; i < df.length; i++){
+            df_y[i] = df[i].y;
+        }
+        for(let i = 0; i < df.length; i++){
+            this.y_scale = {"y_scale":Math.max(Math.abs((df_y[i] - floor)))};
+        }
+
+        if(this.y_scale == 0){
+            this.y_scale = 1;
+        }
+
+        for(let i = 0; i < df.length; i++){
+            df_ds[i] = {"ds":new Date(df[i].ds)};
+        }
+        console.log("df_ds::init");
+        console.log(df_ds);
+        let d_min = this.Date_min(df_ds);
+        console.log("df_ds::max");
+        console.log(d_min);
+        this.start = Math.min(df_ds);
+        this.t_scale = (Math.max(df_ds) - this.start);
+        /*
+        for name, props in self.extra_regressors.items():
+        standardize = props['standardize']
+        if standardize == 'auto':
+            if set(df[name].unique()) == set([1, 0]):
+                # Don't standardize binary variables.
+                standardize = False
+            else:
+                standardize = True
+        if standardize:
+            mu = df[name].mean()
+            std = df[name].std()
+            if std == 0:
+                std = mu
+            self.extra_regressors[name]['mu'] = mu
+            self.extra_regressors[name]['std'] = std
+        */
     }
     set_changepoints(){
         /*
@@ -461,12 +551,12 @@ class prophet_js {
 
     get_changepoint_matrix(){
         //Gets changepoint matrix for history dataframe.
-        let count = shape0(history);
+        let count = prophet_js.shape0(history);
         let A = nj.zeros(count,this.changepoints_t.length);
         function enumrate_t(df){
             let idx = [];
             let t = [];
-            let len = shape0(df);
+            let len = prophet_js.shape0(df);
             for(let i = 0; i < len; i++){
                 idx[i] = i;
                 t[i] = df[i].t;
@@ -512,7 +602,7 @@ class prophet_js {
         let t = nj.array((dates-new Date(1970,1,1))/(3600*24));
 
         for(fun in (Math.sin,Math.cos)){
-            for(i = 0;i < range(series_order);i++){
+            for(i = 0;i < prophet_js.range(series_order);i++){
                 fun = 2.0*(i+1)*Math.PI*t/period;
             }
         }
@@ -537,10 +627,10 @@ class prophet_js {
         -------
         pd.DataFrame with seasonality features.*/
         let columns = [];
-        let features = fourier_series(dates,period,series_order);
+        let features = prophet_js.fourier_series(dates,period,series_order);
         console.log(features);
 
-        for(let i in range(shape1(features))){
+        for(let i in prophet_js.range(prophet_js.prophet_js.shape1(features))){
             columns[i] = ""+prefix+"_delim_"+(i+1)+"";
         }
         return DF.DataFrame(features,columns = columns);
@@ -616,7 +706,7 @@ class prophet_js {
         -------
         The prophet object.*/
         let ps;
-        let check_seasonalities;
+    
 
         if(this.history != null){
             console.log("Seasonality must be added prior to model fitting.");
@@ -656,22 +746,23 @@ class prophet_js {
         -------
         pd.DataFrame with regression features.
         list of prior scales for each column of the features dataframe. */
-
+        let features;
         let seasonal_features = [];
         let prior_scales = [];
+        let props;
         let df_ds=[];
         let props_priod=[];
         let props_f_order=[];
         let props_p_scale=[];
 
         //df["ds"]
-        let len = shape0(df);
+        let len = prophet_js.shape0(df);
         for(let i=0; i < len; i++){
             df_ds[i] = {"ds":(df[i].ds)};
         }
         
         //props["peiod"]
-        len = shape0(props);
+        len = prophet_js.shape0(props);
         for(let i=0; i < len; i++){
             props_priod[i] = {"period":(props[i].peiod)};
         }
@@ -694,7 +785,7 @@ class prophet_js {
                 name
             );
             seasonal_features.push(features);
-            prior_scales.push(props_p_scale*shape1(features));
+            prior_scales.push(props_p_scale*prophet_js.shape1(features));
         }
 
         for(name in this.seasonalities){
@@ -705,7 +796,7 @@ class prophet_js {
                 name
             );
             seasonal_features.push(features);
-            prior_scales.push(props_p_scale*shape1(features));
+            prior_scales.push(props_p_scale*prophet_js.shape1(features));
         }
         //Holiday features
         if(this.holidays != null){
@@ -726,7 +817,7 @@ class prophet_js {
         }
 
         if(seasonal_features.length == 0){
-            const df_z = new DataFrame({"zeros":nj.zeros(shape0(f_df))})
+            const df_z = new DataFrame({"zeros":nj.zeros(prophet_js.shape0(f_df))})
             seasonal_features.push(df_z);
             prior_scales.push(1.);
         }
@@ -782,13 +873,15 @@ class prophet_js {
         spacing between dates in the history is <1 day.*/
 
         let date = [];//historyチェック用配列
-        
-        for(let i=0; i< len; i++){
-            date[i] = new Date(history[i].ds);
+        let yearly_disable;
+        let weekly_disable;
+        let daily_disable;
+        for(let i=0; i<this.shape0(this.history); i++){
+            date[i] = new Date(this.history[i].ds);
         }
 
         let first = date[0];
-        for(let i = 0; i< shape0(history)-1; i++){/*dsの最小値を求める*/
+        for(let i = 0; i< this.shape0(this.history)-1; i++){/*dsの最小値を求める*/
             if(first.getTime() > date[i+1].getTime()){
                 first = date[i+1];
                 console.log(first);
@@ -796,7 +889,7 @@ class prophet_js {
         }
 
         let last = date[0];
-        for(let i = 0; i< shape0(history)-1; i++){/*dsの最大値を求める*/
+        for(let i = 0; i< this.shape0(this.history)-1; i++){/*dsの最大値を求める*/
             if(last.getTime() < date[i+1].getTime()){
                 last = date[i+1];
                 console.log(last);
@@ -807,8 +900,10 @@ class prophet_js {
         //let min_dt = dt.iloc//???iloc,jsでどう実装?
 
         //Yearly seasonality
-        let yearly_disable = getDiff(first,last) < time_d.timedelta(days=730); 
-        fourier_order = this.parse_seasonality_args(
+        if(this.getDiff(first,last) < 730){
+            yearly_disable = true;
+        } 
+        let fourier_order = this.parse_seasonality_args(
             "yearly",this.yearly_seasonality,yearly_disable,10);
         if(fourier_order > 0){
             let a_obj = {
@@ -822,10 +917,11 @@ class prophet_js {
         }
 
         //Weekly seasonality
-        let weekly_disable = (getDiff(first,last) < time_d.timedelta(days=730))||
-                              (min_dt >= time_d.timedata(weeks = 1));
-        let fourier_order = this.parse_seasonality_args(
-            "weekly",this.weekly_seasonality,weekly_disable,3)
+        if((this.getDiff(first,last) < 14)||(this.getDiff(first,last) >= 7)){
+        weekly_disable = true;
+        }
+        fourier_order = this.parse_seasonality_args(
+            "weekly",this.weekly_seasonality,weekly_disable,3);
         if(fourier_order > 0){
             let a_obj = {
                 "weekly":{
@@ -838,8 +934,9 @@ class prophet_js {
         }
 
         //Daily seasonality
-    let daily_disable = ((last - first < time_d.timedelta(days=2)) ||
-                            (min_dt >= time_d.Timedelta(days=1)));
+        if((this.getDiff(first,last) < 2) || (this.getDiff(first,last) >= 1)){
+        daily_disable = true;
+        }      
         fourier_order = this.parse_seasonality_args(
             "daily",this.dalily_seasonality,daily_disable,4);
         if(fourier_order > 0){
@@ -877,11 +974,9 @@ class prophet_js {
         let i0;
         let i1;
 
-        const D_df = new DataFrame(df);
-
         let date = [];
         
-        for(let i=0; i< len; i++){
+        for(let i=0; i<prophet_js.shape0(df); i++){
             date[i] = new Date(df[i].ds);
         }
 
@@ -890,7 +985,7 @@ class prophet_js {
         i0 = 0;
         i1 = 0;
 
-        for(let i = 0; i< shape0(f_df)-1; i++){/*dsの最小値を求める*/
+        for(let i = 0; i< prophet_js.shape0(f_df)-1; i++){/*dsの最小値を求める*/
             if(min.getTime() > date[i+1].getTime()){
                 min = date[i+1];
                 i0 = i+1;
@@ -901,7 +996,7 @@ class prophet_js {
             }
         }
 
-        for(let i = 0; i< shape0(f_df)-1; i++){/*dsの最大値を求める*/
+        for(let i = 0; i< prophet_js.shape0(f_df)-1; i++){/*dsの最大値を求める*/
             if(max.getTime() < date[i+1].getTime()){
                 max = date[i+1];
                 i1 = i+1;
@@ -951,6 +1046,7 @@ class prophet_js {
         let df_c = []; //f_dfチェック用配列
         let stan_fit;
 
+
         if(this.history != null){
             console.log("Prophet object can only be fit once. Instantiate a new object.");
         }
@@ -960,7 +1056,7 @@ class prophet_js {
         console.log("history");
         console.log(history);
 
-        len = shape0(history);
+        len = this.shape0(history);
         if(len < 2){
             console.log("Dataframe has less than 2 non-NaN rows.");
         }
@@ -979,18 +1075,19 @@ class prophet_js {
 
         history =  this.setup_dataframe(history,true);
         this.history = history;
-        console.log("history");
+        console.log("history:991");
         console.log(history);
         this.set_auto_seasonalities();
-        seasonal_features,prior_scale = (
-            this.make_all_seasonality_features(history));
-        
+        let seasonal_res = [];
+        seasonal_res = this.make_all_seasonality_features(history);
+        let seasonal_features = seasonal_res[0];
+        let prior_scales = seasonal_res[1];
         this.set_changepoints();
         let A = this.get_changepoint_matrix();
 
         let dat = {
-            "T": shape0(history),
-            "K": shape1(seasonal_features),
+            "T": prophet_js.shape0(history),
+            "K": prophet_js.shape1(seasonal_features),
             "S": this.changepoints_t.length,
             "y": history["y_scaled"],
             "t": history["t"],
@@ -1012,13 +1109,18 @@ class prophet_js {
                 "k": kinit[0],
                 "m": kinit[1],
                 "delta": nj.zeros(this.changepoints_t.length),
-                "beta": nj.zeros(shape1(seasonal_features)),
+                "beta": nj.zeros(prophet_js.shape1(seasonal_features)),
                 "sigma_obs": 1,
             }
             return dict;
         }
+        let history_c;
         history_c.length = 0;
-        history_c = c_array_push(history,y)
+
+        for(let a_c_cnt in history_c){
+            history_c.push(history[a_c_cnt].y); //チェック用配列にyの値を入れていく
+        }
+
         if(Math.max(history_c) == Math.min(history_c)){
             console.log("972:Math.max(history_c) == Math.min(history_c)")
             //Nothing to fit
@@ -1085,7 +1187,7 @@ class prophet_js {
         }
         else
         {
-            if(shape0(shape0) == 0){
+            if(prophet_js.shape0(prophet_js.shape0) == 0){
                 console.log("Dataframe has no rows.");
             }
             df = this.setup_dataframe(df);
@@ -1150,9 +1252,9 @@ class prophet_js {
             params_m.push(params_m[a_c_cnt].m);
             params_delta.push(params_delta[a_c_cnt].delta); 
         }
-        let k = average(params_k);
-        let m = average(params_m);
-        let deltas = average(params_delta);
+        let k = prophet_js.average(params_k);
+        let m = prophet_js.average(params_m);
+        let deltas = prophet_js.average(params_delta);
 
         let t = nj.array(df["t"]);
         trend =this.piecewise_linear(t, deltas, k, m, this.changepoints_t);
@@ -1176,12 +1278,12 @@ class prophet_js {
         let upper_p = 100 * (1.0 + this.interval_width) / 2;
         for(x in seasonal_features);
         let components = [
-                {"col":nj.arange(shape1(seasonal_features))},
+                {"col":nj.aprophet_js.range(prophet_js.shape1(seasonal_features))},
                 {"component":x[0].split("_delim_")}
             ];
                          
         //Add total for all regression components
-        components = components.push({"col": nj.arange(shape1(seasonal_features)),
+        components = components.push({"col": nj.aprophet_js.range(prophet_js.shape1(seasonal_features)),
         "component": "seasonal",})
         //Add totals for seasonality, holiday, and extra regressors
         components =this.add_group_component(components, "seasonalities", this.seasonalities.keys());
@@ -1224,7 +1326,7 @@ class prophet_js {
         data[component + '_lower'] = np.nanpercentile(comp, lower_p,axis=1);
         data[component + '_upper'] = np.nanpercentile(comp, upper_p,axis=1);
             
-        return pd.DataFrame(data)
+        return pd.DataFrame(data);
     }
     add_group_component(components, name, group){
         /*Adds a component with given name that contains all of the components
@@ -1258,7 +1360,7 @@ class prophet_js {
         -------
         Dictionary with posterior predictive samples for each component.
     */ 
-        let n_iterations = shape0(this.params["k"]);
+        let n_iterations = prophet_js.shape0(this.params["k"]);
         let samp_per_iter = Math.max(1, int(nj.ceil(
             this.uncertainty_samples / float(n_iterations)
         )));
@@ -1266,19 +1368,21 @@ class prophet_js {
         //Generate seasonality features once so we can re-use them.
         let seasonal_features,_ = this.make_all_seasonality_features(df);
 
-        sim_values = {'yhat': [], 'trend': [], 'seasonal': []};
-        for(i in range(n_iterations)){
-            for(_j in range(samp_per_iter)){
+        sim_values = {"yhat": [], "trend": [], "seasonal": []};
+        for(i in prophet_js.range(n_iterations)){
+            for(_j in prophet_js.range(samp_per_iter)){
                 let sim = this.sample_model(df, seasonal_features, i);
                 for(key in sim_values){
                     sim_values[key].push(sim[key]);
                 }
             }
         }
-        for(k, v in sim_values){
-            sim_values[k] = nj.stack(v,-1)
-        }
+        for(k in sim_values){
+            for(v in sim_valus[k]){
+                sim_values[k] = nj.stack(v,-1);
+            }
         return sim_values;
+        }
     }
     predict_sample(df){
     /*
@@ -1295,7 +1399,7 @@ class prophet_js {
         posterior predictive samples for that component. "seasonal" is the sum
         of seasonalities, holidays, and added regressors.
     */
-        let df = this.setup_dataframe(df.copy());
+        df = this.setup_dataframe(df.copy());
         let sim_values = this.sample_posterior_predictive(df);
         return sim_values;
     }
@@ -1321,9 +1425,9 @@ class prophet_js {
         for(key in ["yhat","trend"]){
             //???
             series['{}_lower'.format(key)] = np.nanpercentile(
-                sim_values[key], lower_p, axis=1)
+                sim_values[key], lower_p, axis=1);
             series['{}_upper'.format(key)] = np.nanpercentile(
-                sim_values[key], upper_p, axis=1)
+                sim_values[key], upper_p, axis=1);
         }
         return series;
     }
@@ -1342,13 +1446,13 @@ class prophet_js {
         -------
         Dataframe with trend, seasonality, and yhat, each like df['t'].
     */ 
-        let trend = this.sample_predictive_trend(df, iteration)
+        let trend = this.sample_predictive_trend(df, iteration);
     
-        let beta = this.params['beta'][iteration]
-        let seasonal = np.matmul(seasonal_features.as_matrix(), beta) * this.y_scale
+        let beta = this.params['beta'][iteration];
+        let seasonal = np.matmul(seasonal_features.as_matrix(), beta) * this.y_scale;
     
-        let sigma = this.params['sigma_obs'][iteration]
-        let noise = np.random.normal(0, sigma, df.shape[0]) * this.y_scale
+        let sigma = this.params['sigma_obs'][iteration];
+        let noise = np.random.normal(0, sigma, df.shape[0]) * this.y_scale;
     
         return pd.DataFrame({
             'yhat': trend + seasonal + noise,
@@ -1421,7 +1525,7 @@ class prophet_js {
         Parameters
         ----------
         periods: Int number of periods to forecast forward.
-        freq: Any valid frequency for pd.date_range, such as 'D' or 'M'.
+        freq: Any valid frequency for pd.date_prophet_js.range, such as 'D' or 'M'.
         include_history: Boolean to include the historical dates in the data
             frame for predictions.
 
@@ -1431,12 +1535,12 @@ class prophet_js {
         requested number of periods.
     */ 
         let last_date = Math.max(this.history_dates);
-        let dates =  pd.date_range(
+        let dates =  pd.date_prophet_js.range(
             start=last_date,
             periods=periods + 1,  // An extra in case we include start
             freq=freq)
         dates = dates[dates > last_date]; // Drop start if equals last_date
-        dates = dates[:periods];  // Return correct number of periods
+        dates = dates[periods];  // Return correct number of periods
 
         if(include_histor){
             dates = np.concatenate((np.array(this.history_dates), dates));
@@ -1498,4 +1602,5 @@ let f_df =[
     {"ds":"2007-1-3","y":8.3},
     {"ds":"2007-1-4","y":7.1},
     {"ds":"2007-1-5","y":9.5}];
+console.log("go fit")
 test.fit(f_df);
