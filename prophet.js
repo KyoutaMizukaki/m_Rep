@@ -119,7 +119,54 @@ class prophet_js {
             console.log(i+"   "+df[i]);
         }
     }
-
+    /*
+    check_3d_df_log(masseage,df){//3次元dfをlogするためのメソッド
+        console.log(masseage);
+        console.log(this.shape0(df));
+        for(let i = 0; i<this.shape0(df); i++){
+            for(let j = 0; j < 3; j++){
+                for(let l = 0; l< 10; l++){
+                    console.log(i+" "+j+" "+l+"   "+df[i][j][l]);
+                }
+                console.log("・・・");
+                for(let l = this.shape0(df[j]) - 11; l < this.shape0(df[j]); l++){
+                    console.log(i+" "+j+" "+l+"   "+df[i][j][l]);
+                }
+            }
+            for(let j = this.shape0(df[i]) -3; j < this.shape0(df[i]); j++){
+                for(let l = 0; l< 10; l++){
+                    console.log(i+" "+j+" "+l+"   "+df[i][j][l]);
+                }
+                console.log("・・・");
+                for(let l = this.shape0(df[j]) - 11; l < this.shape0(df[j]); l++){
+                    console.log(i+" "+j+" "+l+"   "+df[i][j][l]);
+                }
+            }
+        }
+    }
+    */
+    check_2d_df_log(masseage,df){//2次元dfをlogするためのメソッド
+        console.log(masseage);
+        console.log(this.shape0(df));
+        for(let i = 0; i < 3; i++){
+            for(let j = 0; j< 10; j++){
+                console.log(i+" "+j+"   "+df[i][j]);
+            }
+            console.log("・・・");
+            for(let j = this.shape0(df[i]) - 11; j < this.shape0(df[i]); j++){
+                console.log(i+" "+j+"   "+df[i][j]);
+            }
+        }
+        for(let i = this.shape0(df) -3; i < this.shape0(df); i++){
+            for(let j = 0; j< 10; j++){
+                console.log(i+" "+j+"   "+df[i][j]);
+            }
+            console.log("・・・");
+            for(let j = this.shape0(df[i]) - 11; j < this.shape0(df[i]); j++){
+                console.log(i+" "+j+"   "+df[i][j]);
+            }
+        }
+    }
     shape0(df){
         let len = Object.keys(df).length;
         return len;
@@ -209,7 +256,7 @@ class prophet_js {
     getDiff(date1, date2) {/*data型の2つの日付の日数を求める*/
         let msDiff = date2.getTime() - date1.getTime();
         let daysDiff = Math.floor(msDiff / (1000 * 60 * 60 *24));
-        return ++daysDiff;
+        return daysDiff;
     }
 
     validate_inputs(){
@@ -604,38 +651,78 @@ class prophet_js {
         
         let t = [];
         let fun = [];
+        let fun_sin = [];
+        let fun_cos = [];
+        let result = [];
         let d2 = new Date(1970,0,1);
         let d_dif = [];
         console.log("series_order");
         console.log(series_order);
         console.log("piriod");
         console.log(period);
-        this.check_df_log("dates",dates); 
+        //console.log("dates");
+        //console.log(dates);
+        //this.check_df_log("dates",dates); 
 
         for(let i = 0; i<dates.length; i++){
             d_dif[i] = parseFloat((this.getDiff(d2,dates[i].ds) - 1) * 86400);
         }
-        this.check_df_log("d_dif",d_dif);
+        //this.check_df_log("d_dif",d_dif);
 
         for(let i = 0; i<dates.length; i++){
             t[i] = d_dif[i]/(3600*24);
         }
 
-        this.check_df_log("t",t);
-        let fun2 = [];
+        //this.check_df_log("t",t);
 
-        for(let cont in this.range(series_order.fourier_order)){
-            for(let i = 0; i<t.length; i++){
-                fun[i] = (2.0*(cont+1)*Math.PI*t[i]/period.period);
+        for(let i in this.range(series_order.fourier_order)){
+            fun[i] = [];
+            for(let j = 0; j<t.length; j++){
+                fun[i][j] = (2.0*(i+1)*Math.PI*t[j]/period.period);
             }
-            fun2[cont] = fun;
         }
-        x = Math.sin(fun2)
-        y = Math.cos(fun2)
+        
+        //this.check_2d_df_log("fun",fun);
+
+        console.log(this.range(series_order.fourier_order));
+        for(let i in this.range(series_order.fourier_order)){//配列funにsin適用
+            fun_sin[i] = [];
+            for(let j = 0; j<fun[i].length; j++){
+                fun_sin[i][j] = Math.sin(fun[i][j]);
+            }
+        }
+        //this.check_2d_df_log("fun_sin",fun_sin);
+        
+        for(let i in this.range(series_order.fourier_order)){////配列funにcos適用
+            fun_cos[i] = [];
+            for(let j = 0; j<fun[i].length; j++){
+                fun_cos[i][j] = Math.cos(fun[i][j]);
+            }
+        }
+
+        //this.check_2d_df_log("fun_cos",fun_cos);
+
+        result = fun_sin.concat(fun_cos);
+        /*
+            for(let i = 0; i<)
+            x = Math.sin(fun2)
+            y = Math.cos(fun2)
         [x y]
-        this.check_df_log("fun",fun);
-        this.check_df_log("fun2",fun2);
-        return fun2;
+        */
+
+        console.log("result");
+        console.log(result);
+        let n_res = [];
+        for(let i = 0; i<result[0].length; i++){
+            n_res[i] = []; 
+            for(let j = 0; j<result.length; j++){
+                n_res[i][j] = result[j][i];
+            }
+        }
+        console.log("n_res.length");
+        console.log(n_res.length);
+        //this.check_3d_df_log("result",result);
+        return result;
     }
     /* make_seasonality_features*/ 
     make_seasonality_features(dates,period,series_order,prefix){
@@ -652,16 +739,31 @@ class prophet_js {
         Returns
         -------
         pd.DataFrame with seasonality features.*/
-
+        let k_num;
+        let num;
         let features = this.fourier_series(dates,period,series_order); 
-        this.check_df_log("featurs",features);
+        console.log("features[0]");
+        console.log(features.length);
+        //this.check_df_log("featurs",features);
+
+        console.log("this.range(this.shape1(features)):736");
+        console.log(this.range(this.shape1(features)));
         let key = [];
-        for(let i in this.range(this.shape1(features))){
-            let num = i+1;
-            key[i] = prefix+"_delim_"+ num;
-            features[i] = {key:features[i]} ;
+
+        for(let i = 0; i <features.length; i++){
+            num = i+1;
+            num + "";
+            prefix + "";
+            console.log(num,prefix);
+            key[i] = (prefix+"_delim_"+ num);
+            key[i] + "";
+            console.log(key[i]);
+            k_num = key[i];
+            k_num +"";
+            features[i] = {[k_num]:features[i]}; 
+            console.log(features[i]);
         }
-        this.check_df_log("features",features);
+        //this.check_df_log("features",features);
         return features;
     }
     /*make_holiday_features（不要）*/ 
@@ -792,6 +894,7 @@ class prophet_js {
         console.log("this.seasonalities");
         console.log(this.seasonalities);
 
+
         if("yeary" in this.seasonalities){
             console.log("yeary found");
             name = "yeary";
@@ -804,7 +907,7 @@ class prophet_js {
                 props_f_order,
                 name
             );
-            this.check_df_log("featurs",features);
+            //this.check_df_log("featurs",features);
             seasonal_features.push(features);
             for(let i = 0; i<props_p_scale.length; i++){
                 props_p_scale[i] = props_p_scale[i] * this.shape1(features);
@@ -824,7 +927,10 @@ class prophet_js {
                 props_f_order,
                 name
             );
-            this.check_df_log("featurs",features);
+            //console.log("featurs:908");
+            //console.log(features);
+
+            //this.check_df_log("featurs",features);
             seasonal_features.push(features);
             for(let i = 0; i<props_p_scale.length; i++){
                 props_p_scale[i] = props_p_scale[i] * this.shape1(features);
@@ -844,7 +950,7 @@ class prophet_js {
                 props_f_order,
                 name
             );
-            this.check_df_log("featurs",features);
+            //this.check_df_log("featurs",features);
             seasonal_features.push(features);
             for(let i = 0; i<props_p_scale.length; i++){
                 props_p_scale[i] = props_p_scale[i] * this.shape1(features);
@@ -871,16 +977,20 @@ class prophet_js {
                 name
             );
             seasonal_features.push(features);
-            prior_scales.push(props_p_scale*prophet_js.shape1(features));
+            prior_scales.push(props_p_scale*this.shape1(features));
         }
+        /*
         //Holiday features
         if(this.holidays != null){
             features,holiday_priors = this.make_holiday_features(df["ds"]);
             seasonal_features.push(features);
             prior_scales.push(holiday_priors);
         }
-
+        */
         //Additional regressors
+        console.log("this.extra_regressors");
+        console.log(this.extra_regressors);
+        /*
         for(name in this.extra_regressors){
             seasonal_features.push(DF.DataFrame(df[name]));
             prior_scales.push(props_p_scale);
@@ -890,12 +1000,17 @@ class prophet_js {
             seasonal_features.push(DF.DataFrame(df[name]));
             prior_scales.push(props_p_scale);
         }
-
+        */
+        let df_z;
+        //console.log("seasonal_features");
+        //console.log(seasonal_features);
         if(seasonal_features.length == 0){
-            const df_z = new DataFrame({"zeros":nj.zeros(prophet_js.shape0(f_df))})
+            df_z = new DF({"zeros":nj.zeros(prophet_js.shape0(f_df))})
             seasonal_features.push(df_z);
             prior_scales.push(1.);
         }
+        console.log("df_z");
+        console.log(df_z);
         return concat(seasonal_features,axis=1),prior_scales;
 
     }
@@ -947,7 +1062,9 @@ class prophet_js {
         Turns on daily seasonality if there is >=2 days of history, and the
         spacing between dates in the history is <1 day.*/
 
-        let date = [];//historyチェック用配列
+        let date = [];//
+        let dt = [];
+        let min_dt = 1;
         let yearly_disable;
         let weekly_disable;
         let daily_disable;
@@ -960,7 +1077,6 @@ class prophet_js {
         for(let i = 0; i< this.shape0(this.history)-1; i++){/*dsの最小値を求める*/
             if(first.getTime() > date[i+1].getTime()){
                 first = date[i+1];
-                console.log(first);
             }
         }
 
@@ -968,18 +1084,34 @@ class prophet_js {
         for(let i = 0; i< this.shape0(this.history)-1; i++){/*dsの最大値を求める*/
             if(last.getTime() < date[i+1].getTime()){
                 last = date[i+1];
-                console.log(last);
             }
         }
-        
-        //let dt = last-first;
-        //let min_dt = dt.iloc//???iloc,jsでどう実装?
+        console.log("first");
+        console.log(first);
+        console.log("last");
+        console.log(last);
         console.log("getdiff");
         console.log(this.getDiff(first,last));
+
+        for(let i = 0; i < date.length; i++){
+            if(i - 1 < 0){
+                dt[0] = 1;
+                i++;
+            }
+            dt[i] = this.getDiff(date[i-1],date[i]);
+        }
+        
+        for(let i = 0; i < dt.length; i++){
+            min_dt = Math.min(min_dt,dt[i]);
+        }
+        
 
         //Yearly seasonality
         if(this.getDiff(first,last) < 730){
             yearly_disable = true;
+        }
+        else{
+            yearly_disable = false;
         } 
         let fourier_order = this.parse_seasonality_args(
             "yearly",this.yearly_seasonality,yearly_disable,10);
@@ -995,8 +1127,11 @@ class prophet_js {
         }
 
         //Weekly seasonality
-        if((this.getDiff(first,last) < 14)||(this.getDiff(first,last) >= 7)){
+        if((this.getDiff(first,last) < 14)||(min_dt >= 7)){
         weekly_disable = true;
+        }
+        else{
+            weekly_disable = false;
         }
         fourier_order = this.parse_seasonality_args(
             "weekly",this.weekly_seasonality,weekly_disable,3);
@@ -1012,9 +1147,12 @@ class prophet_js {
         }
 
         //Daily seasonality
-        if((this.getDiff(first,last) < 2) || (this.getDiff(first,last) >= 1)){
-        daily_disable = true;
+        if((this.getDiff(first,last) < 2) || (min_dt >= 1)){
+            daily_disable = true;
         }      
+        else{
+            daily_disable = false;
+        }
         fourier_order = this.parse_seasonality_args(
             "daily",this.dalily_seasonality,daily_disable,4);
         if(fourier_order > 0){
@@ -1128,9 +1266,9 @@ class prophet_js {
         if(this.history != null){
             console.log("Prophet object can only be fit once. Instantiate a new object.");
         }
-        this.check_df_log("f_df",f_df);
+        //this.check_df_log("f_df",f_df);
         let history = f_df;
-        this.check_df_log("history",history);
+        //this.check_df_log("history",history);
 
         len = this.shape0(history);
         if(len < 2){
