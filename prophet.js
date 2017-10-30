@@ -179,9 +179,22 @@ class prophet_js {
 
     Date_max(date){
         let last = date[0].ds;
+        console.log("last");
+        console.log(last);
         for(let i = 0; i< this.shape0(date)-1; i++){/*dsの最大値を求める*/
             if(last.getTime() < date[i+1].ds.getTime()){
                 last = date[i+1].ds;
+            }
+        }
+        return last;
+    }
+    Date_max_array(date){
+        let last = date[0];
+        console.log("last");
+        console.log(last);
+        for(let i = 0; i< this.shape0(date)-1; i++){/*dsの最大値を求める*/
+            if(last.getTime() < date[i+1].getTime()){
+                last = date[i+1];
             }
         }
         return last;
@@ -195,16 +208,6 @@ class prophet_js {
         }
         return first;
     }
-    /*
-    c_array_push(array,pra){
-        let c_array = [];
-
-        c_array.length = 0;
-        for(let a_c_cnt in array){
-            c_array.push(array[a_c_cnt].pra); //チェック用配列にyの値を入れていく
-        }
-        return c_array;
-    }*/
 
     /*既存のjsonオブジェクトに新しいパラメータを挿入します*/ 
     json_add(df,injson,mode){
@@ -254,6 +257,7 @@ class prophet_js {
         let daysDiff = Math.floor(msDiff / (1000 * 60 * 60 *24));
         return daysDiff;
     }
+
     enumrate_t(df){
         console.log("df_enum");
         console.log(df);
@@ -1311,9 +1315,11 @@ class prophet_js {
         let kinit;
         let model;
         let his_date = [];
-        let df_c = []; //f_dfチェック用配列
         let stan_fit;
-
+        let h_y_max;
+        let h_y_min;
+        let history_c = [];
+        let params;
 
         if(this.history != null){
             console.log("Prophet object can only be fit once. Instantiate a new object.");
@@ -1343,7 +1349,8 @@ class prophet_js {
             return (a.ds < b.ds ? -1 : 1);
         });
         this.history = history;
-        //this.check_df_log("history",history);
+        console.log("history:1346");
+        console.log(history);
         this.set_auto_seasonalities();
         let seasonal_res = [];
         seasonal_res = this.make_all_seasonality_features(history);
@@ -1371,26 +1378,34 @@ class prophet_js {
         }
 
         /*model = prophet_stan_models(this.growth);*///stan
-        let h_y_max;
-        let h_y_min;
-        let history_c = [];
         history_c.length = 0;
-
-        for(let a_c_cnt in history_c){
-            history_c.push(history[a_c_cnt].y); //チェック用配列にyの値を入れていく
+        console.log("history_len");
+        console.log(history.length);
+        for(let i = 0; i<history.length; i++){
+            history_c[i] = parseFloat(history[i].y); //チェック用配列にyの値を入れていく
         }
+        console.log("history_c");
+        console.log(history_c);
         h_y_max = history_c[0];
         h_y_min = history_c[0];
-        for(let i = 0; i<history_c;i++){
+
+        for(let i = 0; i<history_c.length;i++){
             if(h_y_max < history_c[i]){
                 h_y_max = history_c[i];
             }
         }
-        for(let i = 0; i<history_c;i++){
+        for(let i = 0; i<history_c.length;i++){
             if(h_y_min > history_c[i]){
                 h_y_min = history_c[i];
             }
         }
+
+        console.log("y_max");
+        console.log(h_y_max);
+        console.log("y_min");
+        console.log(h_y_min);        
+        console.log("this.params");
+        console.log(this.params);
 
         if(h_y_max == h_y_min){
             console.log("972:Math.max(history_c) == Math.min(history_c)");
@@ -1413,30 +1428,76 @@ class prophet_js {
             }
         }
         else
-            try{
+            try{/*
                 params = model.optimaizing(
-                    dat,init = stan_init, iter =1e4, arguments)
+                    dat,
+                    init = stan_init, 
+                    iter =1e4, 
+                    arguments);
+                */
+                params = {"k":-0.0983719917945991,"m":0.5351992970077604,
+                          "delta":[1.60834641e-10,  -2.12494327e-09,   1.93902651e-07,
+                            4.16927686e-08,   3.04835503e-08,   1.09929522e-08,
+                            1.20121166e-08,   1.71768905e-08,   9.22479071e-05,
+                            1.94736871e-02,   5.94495764e-02,   5.40824298e-02,
+                            1.74083484e-02,   1.77527980e-04,   7.41171067e-07,
+                           -1.78426854e-08,  -2.62742803e-08,  -8.73779659e-09,
+                           -3.21634177e-08,  -4.64211164e-08,  -1.63291646e-02,
+                           -2.54192089e-02,  -3.19197164e-02,  -3.89444297e-02,
+                           -1.09197165e-02],
+                          "sigma_obs":0.06728901848417033,
+                          "beta":[ -1.46130463e-01,  -2.71103960e-01,   1.49713009e-02,
+                            -1.88495889e-02,  -1.36937260e-02,   1.00016654e-02,
+                             8.42145225e-03,  -7.39760986e-03,  -3.74941481e-03,
+                             4.09109223e-03,  -2.50521744e-03,   9.03214046e-04,
+                            -2.70469253e-03,  -1.80947283e-03,  -1.38060554e-02,
+                            -1.80433958e-03,   3.67033919e-03,  -3.66275830e-03,
+                             4.19312520e-03,   6.48510452e-03,   5.40182987e-03,
+                             4.54476116e-03,   7.28017233e-05,  -2.80520267e-03,
+                            -2.91293349e-04,  -2.30941108e-04],
+                          "gamma":[-5.14083327e-12,   1.35841122e-10,  -1.85934049e-08,
+                          -5.33058228e-09,  -4.87180028e-09,  -2.10823741e-09,
+                          -2.68764253e-09,  -4.39226423e-09,  -2.65370692e-05,
+                          -6.22446621e-03,  -2.09023625e-02,  -2.07439457e-02,
+                          -7.24950399e-03,  -7.96038704e-05,  -3.56032860e-07,
+                           9.14132102e-09,   1.43008868e-08,   5.03520516e-09,
+                           1.95624075e-08,   2.97179933e-08,   1.09755846e-02,
+                           1.78979087e-02,   2.34952433e-02,   2.99107446e-02,
+                           8.73577317e-03]};
             }
             catch (e){
-                console.log("RuntimeError")
+                console.log("RuntimeError");
                 params = model.optimaizing(
                     dat,init = stan_init, iter = 1e4, algotithm = "Newton",arguments
                 )
             }
-            for(par in params){
-                this.params[par] = params[par].reshape((1,-1));
-            }
+            this.params = params;
+            console.log("this.params");
+            console.log(this.params);
+            
 
-            if(this.changepoints.length == 0){
-                this.params["k"] = this.params["k"]+this.params["delta"];
-                this.params["delta"] = nj.zeros(this.params["delta"].shape);
+            if(this.changepoints.length == 0){    
+                let para_k_res;
+                let pa_k_obj;
+                let para_d_res;
+                let pa_d_obj;
+                for(let i = 0; i<this.params.delta.length; i++){
+                    para_k_res[i] = this.params.k+this.params.delta[i];
+                    para_d_res[i] = 0;  
+                }
+                pa_k_obj = {"k":para_k_res};
+                pa_d_obj = {"delta":para_d_res};
+                Object.assign(this.params,pa_k_obj,pa_d_obj);
+                console.log("change_len == 0 : this.params");
+                console.log(this.params);
             }
 
         return this;
-    }
+    }/*
     prophet_stan_models(growth){
 
     }
+    */
     predict(df=null){
     /*Predict using the prophet model.
 
@@ -1458,12 +1519,12 @@ class prophet_js {
         }
         else
         {
-            if(prophet_js.shape0(prophet_js.shape0) == 0){
+            if(this.shape0(df) == 0){
                 console.log("Dataframe has no rows.");
             }
             df = this.setup_dataframe(df);
         }
-        df["trend"] = this.predict_trend();
+        df["trend"] = this.predict_trend(df);
         let seasonal_components = this.predict_seasonal_components(df);
         let intervals = this.predict_uncertainty(df);
 
@@ -1503,34 +1564,55 @@ class prophet_js {
         
         //Intercept changes
         let gammas = -changepoints_ts * deltas;
+        console.log("k");
+        console.log(k);
+        console.log("m");
+        console.log(m);
+
         //Get cumulative slope and intercept at each t
         let k_t = k*nj.ones(t);
         let m_t = m*nj.ones(t);
         
-        let result = enumrate_t(this.changepoints_ts);
+        let result = this.enumrate_t(this.changepoints_ts);
         let idx = result[0];
         let s = result[1];
 
         return k_t * t +m_t;
     }
     predict_trend(df){
+        let result;
         let params_k = [];
         let params_m = [];
         let params_delta = [];
-
-        for(let a_c_cnt in params){
-            params_k.push(params_k[a_c_cnt].k);
-            params_m.push(params_m[a_c_cnt].m);
-            params_delta.push(params_delta[a_c_cnt].delta); 
+        let t = [];
+    
+        console.log("df");
+        console.log(df);
+        params_k.push(this.params.k);
+        console.log("params_k");
+        console.log(params_k);
+        params_m.push(this.params.m);
+        console.log("params_m");
+        console.log(params_m);
+        for(let i = 0; i<this.params.delta.length; i++){
+            params_delta.push(this.params.delta[i]);
         }
-        let k = prophet_js.average(params_k);
-        let m = prophet_js.average(params_m);
-        let deltas = prophet_js.average(params_delta);
-
-        let t = nj.array(df["t"]);
-        trend =this.piecewise_linear(t, deltas, k, m, this.changepoints_t);
-
-        return trend * this.y_scale + df['floor'];
+        console.log("params_delta");
+        console.log(params_delta);
+        
+        let k = this.average(params_k);
+        let m = this.average(params_m);
+        let deltas = this.average(params_delta);
+        console.log("df.lenfth");
+        console.log(df.length);
+        for(let i = 0; i<df.length; i++){
+            t = df[i].t;   
+        }
+        let trend =this.picewise_linear(t, deltas, k, m, this.changepoints_t);
+        for(let i = 0; i<this.shape0(df); i++){
+            result = trend * this.y_scale + df[i].floor;
+        }
+        return result;
     }
 
     predict_seasonal_components(df){
@@ -1789,7 +1871,7 @@ class prophet_js {
         return trend * this.y_scale + df["floor"];
     }
 
-    make_future_dateframe(period,freq = "D",include_history=true){
+    make_future_dateframe(period,include_history){
     /*
     Simulate the trend using the extrapolated generative model.
 
@@ -1805,19 +1887,33 @@ class prophet_js {
         pd.Dataframe that extends forward from the end of this.history for the
         requested number of periods.
     */ 
-        let last_date = Math.max(this.history_dates);
-        let dates =  pd.date_prophet_js.range(
-            start=last_date,
-            periods=periods + 1,  // An extra in case we include start
-            freq=freq)
-        dates = dates[dates > last_date]; // Drop start if equals last_date
-        dates = dates[periods];  // Return correct number of periods
-
-        if(include_histor){
-            dates = np.concatenate((np.array(this.history_dates), dates));
+        let df_ds = [];
+        let h_dates = [];
+        for(let i = 0; i<this.history_dates.length; i++){
+            h_dates[i] = new Date(this.history_dates[i]);
         }
+        console.log("h_dates");
+        console.log(h_dates);
+        let last_date = this.Date_max_array(h_dates);
+        let dates = [];
+        for(let i = 0; i<period; i++){
+             let date = new Date();
+             date.setTime(last_date.getTime() +86400000 * i);
+             dates[i]=date;
+        } 
+        console.log("dates");
+        console.log(dates);
 
-        return pd.DataFrame({'ds': dates});
+        //dates = dates[dates > last_date]; // Drop start if equals last_date
+
+        //dates = dates[periods];  // Return correct number of periods
+
+        for(let i = 0; i<dates.length; i++){
+            df_ds[i] = {"ds":dates[i]};
+        }
+        console.log("df_ds");
+        console.log(df_ds);
+        return df_ds;
     }
 
     copy(cutoff = null){
@@ -2962,3 +3058,5 @@ let f_df =[
     {"ds":"2009/12/31",  "y":"6.2"},];
 console.log("go fit");
 test.fit(f_df);
+let future = test.make_future_dateframe(365);
+let forecast = test.predict(future);
